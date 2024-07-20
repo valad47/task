@@ -7,12 +7,15 @@ local task = {}
     task.DEBUG = false
     task.CLOSE_WHEN_NO_JOBS = true
 
+local function debug(...)
+    if not task.DEBUG then return end
+    print(("[ %.3f ]"):format(os.clock()), ...)
+end
+
 function task.step()
     for i, v in pairs(jobs) do
         if coroutine.status(v) == "dead" then
-            if task.DEBUG then 
-                print("Deleting ", v)
-            end
+            debug("Deleting ", v)
             jobs[i] = nil
             jobs_count = jobs_count - 1
         end
@@ -21,9 +24,7 @@ function task.step()
     for i, v in pairs(new_jobs) do
         table.insert(jobs, v[1])
         new_jobs[i] = nil
-        if task.DEBUG then 
-            print("Starting ", v[1])
-        end
+        debug("Starting ", v[1])
         coroutine.resume(table.unpack(v))
     end
 
@@ -34,9 +35,7 @@ function task.step()
                 wait_poll[i] = nil
                 goto continue
             end
-            if task.DEBUG then 
-                print("Resuming", i)
-            end
+            debug("Resuming", i)
             wait_poll[i] = nil
             coroutine.resume(i)
         end
@@ -52,9 +51,8 @@ function task.spawn(f, ...)
     end
 
     local thread = coroutine.create(f)
-    if task.DEBUG then 
-        print("Creating ", thread)
-    end
+    debug("Creating ", thread)
+
     table.insert(new_jobs, {thread, ...})
 end
 
@@ -75,9 +73,9 @@ function task.wait(time)
     end
 
     wait_poll[thread] = stupid_lua_is_not_like_luau()
-    if task.DEBUG then 
-        print("Waiting ", thread)
-    end
+    
+    debug("Waiting ", thread)
+    
     coroutine.yield()
     return (os.time() - current)
 end
