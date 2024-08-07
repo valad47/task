@@ -8,8 +8,8 @@ local task = {}
     task.DEBUG = false
     task.CLOSE_WHEN_NO_JOBS = true
     task.SHOW_CURSOR = true
-    task.MAX_DEBUG_ROW = 8
-    task.ESCAPE_ROW = 9
+    task.MAX_DEBUG_ROW = 9
+    task.ESCAPE_ROW = 10
 
     io.stdout:write("\27[2J");
 
@@ -32,7 +32,7 @@ function task.step()
 
     for i, v in pairs(jobs) do
         if coroutine.status(v) == "dead" then
-            debug(2, "Deleting ", color(v, get_address(v)))
+            debug(3, "Deleting ", color(v, get_address(v)))
             jobs[i] = nil
             jobs_count = jobs_count - 1
         end
@@ -42,22 +42,22 @@ function task.step()
     for i, v in pairs(new_jobs) do
         table.insert(jobs, v[1])
         new_jobs[i] = nil
-        debug(3, color("Starting", 76), color(v[1], get_address(v[1])))
+        debug(4, color("Starting", 76), color(v[1], get_address(v[1])))
         jobs_count = jobs_count + 1
         total_jobs = total_jobs + 1
         local pass, err = coroutine.resume(table.unpack(v))
         if not pass then
-            debug(7, color("[ ERROR ]", 52), color(v[1], get_address(v[1])), err)
+            debug(8, color("[ ERROR ]", 52), color(v[1], get_address(v[1])), err)
         end
     end
     
     for i, v in pairs(wait_poll) do
         if v <= os.time() then
-            debug(5, color("Resuming", 35), color(i, get_address(i)))
+            debug(6, color("Resuming", 35), color(i, get_address(i)))
             wait_poll[i] = nil
             local pass, err = coroutine.resume(i)
             if not pass then
-                debug(8, color("[ ERROR ]", 52), color(i, get_address(i)), err)
+                debug(9, color("[ ERROR ]", 52), color(i, get_address(i)), err)
             end
         end
     end
@@ -79,7 +79,7 @@ function task.step()
                     color("Jobs:", 45)..
                     " \t\t%d\t"..
                     color("Total:", 46)..
-                    "\t%d"):format(0, os.clock(), jobs_count, total_jobs)..
+                    "\t%d"):format(1, os.clock(), jobs_count, total_jobs)..
                     ("\27[%dH"):format(task.ESCAPE_ROW)
     )
     io.stdout:flush()
@@ -94,7 +94,7 @@ function task.spawn(f, ...)
     end
 
     local thread = coroutine.create(f)
-    debug(1, color("Creating ", 50), color(thread, get_address(thread)))
+    debug(2, color("Creating ", 50), color(thread, get_address(thread)))
 
     table.insert(new_jobs, {thread, ...})
 end
@@ -117,7 +117,7 @@ function task.wait(time)
 
     wait_poll[thread] = stupid_lua_is_not_like_luau()
     
-    debug(4, color("Waiting ", 31), color(thread, get_address(thread)))
+    debug(5, color("Waiting ", 31), color(thread, get_address(thread)))
     
     coroutine.yield()
     return (os.time() - current)
