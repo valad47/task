@@ -2,11 +2,15 @@ function printf(s, ...)
     print(string.format(s, ...))
 end
 
-task = require("task")
+local task = require("task")
+task.COLOR = true
+task.DEBUG = true
 
-task.spawn(function()
-    while true do
-        printf("Actual wait time: %.5f", task.wait(1))
+task.spawn(function ()
+    while task.wait() do
+        task.spawn(function ()
+            task.wait(20)
+        end)
     end
 end)
 
