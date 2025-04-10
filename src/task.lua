@@ -11,8 +11,6 @@ local task = {}
     task.MAX_DEBUG_ROW = 9
     task.ESCAPE_ROW = 10
 
-    io.stdout:write("\27[2J");
-
 local color = function (s, n)
         return "\27[38;5;".. n%256 .."m"..tostring(s).."\27[0m"
 end
@@ -28,8 +26,6 @@ local function get_address(t)
 end
 
 function task.step()
-    io.stdout:flush();
-
     for i, v in pairs(jobs) do
         if coroutine.status(v) == "dead" then
             debug(3, "Deleting ", color(v, get_address(v)))
@@ -38,7 +34,7 @@ function task.step()
         end
     end
 
-    
+
     for i, v in pairs(new_jobs) do
         table.insert(jobs, v[1])
         new_jobs[i] = nil
@@ -50,7 +46,7 @@ function task.step()
             debug(8, color("[ ERROR ]", 52), color(v[1], get_address(v[1])), err)
         end
     end
-    
+
     for i, v in pairs(wait_poll) do
         if v <= os.time() then
             debug(6, color("Resuming", 35), color(i, get_address(i)))
@@ -61,29 +57,6 @@ function task.step()
             end
         end
     end
-
-    if task.SHOW_CURSOR then
-        io.stdout:write("\27[?25h");
-        io.stdout:flush();
-    else
-        io.stdout:write("\27[?25l");
-        io.stdout:flush();
-    end
-
-    io.stdout:write((
-                    "\r"..
-                    "\27[%dH"..
-                    "\27[K"..
-                    color("[ %.3f ]\t", 235)..
-                    color("[ TASK ]\t", 111)..
-                    color("Jobs:", 45)..
-                    " \t\t%d\t"..
-                    color("Total:", 46)..
-                    "\t%d"):format(1, os.clock(), jobs_count, total_jobs)..
-                    ("\27[%dH"):format(task.ESCAPE_ROW)
-    )
-    io.stdout:flush()
-    
 
     return true
 end
@@ -116,9 +89,9 @@ function task.wait(time)
     end
 
     wait_poll[thread] = stupid_lua_is_not_like_luau()
-    
+
     debug(5, color("Waiting ", 31), color(thread, get_address(thread)))
-    
+
     coroutine.yield()
     return (os.time() - current)
 end
@@ -129,9 +102,15 @@ function task.loop()
         task.step()
 
         if task.CLOSE_WHEN_NO_JOBS and jobs_count <= 0 then
+		    if task.DEBUG then print(`\27[{task.ESCAPE_ROW};0H`) end
             return
         end
     end
+end
+
+function task.setdebug()
+	print(`\27[2J`)
+	task.DEBUG = true
 end
 
 return task
