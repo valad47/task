@@ -10,6 +10,9 @@ local task = {}
     task.SHOW_CURSOR = true
     task.MAX_DEBUG_ROW = 9
     task.ESCAPE_ROW = 10
+    task.LOAD_SO = true
+    task.SO_PREFIX = "vlm_"
+    function task.__sleep() end
 
 local color = function (s, n)
         return "\27[38;5;".. n%256 .."m"..tostring(s).."\27[0m"
@@ -43,7 +46,7 @@ function task.step()
         total_jobs = total_jobs + 1
         local pass, err = coroutine.resume(table.unpack(v))
         if not pass then
-            debug(8, color("[ ERROR ]", 52), color(v[1], get_address(v[1])), err)
+            print(color("[ ERROR ]", 52), color(v[1], get_address(v[1])), err)
         end
     end
 
@@ -53,7 +56,7 @@ function task.step()
             wait_poll[i] = nil
             local pass, err = coroutine.resume(i)
             if not pass then
-                debug(9, color("[ ERROR ]", 52), color(i, get_address(i)), err)
+                print(color("[ ERROR ]", 52), color(i, get_address(i)), err)
             end
         end
     end
@@ -96,11 +99,22 @@ function task.wait(time)
     return (os.time() - current)
 end
 
+local function min(t: {})
+    local min = 1;
+    for i, v in t do
+       min = if (v - os.time()) < min then v - os.time() else min
+    end
+
+    return min
+end
+
 
 function task.loop()
     while true do
         task.step()
 
+
+        task.__sleep(min(wait_poll) * 1000000)
         if task.CLOSE_WHEN_NO_JOBS and jobs_count <= 0 then
 		    if task.DEBUG then print(`\27[{task.ESCAPE_ROW};0H`) end
             return
