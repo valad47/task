@@ -102,7 +102,8 @@ end
 local function min(t: {})
     local min = 1;
     for i, v in t do
-       min = if (v - os.time()) < min then v - os.time() else min
+       local time = os.time()
+       min = if (v - time) < min  and (v - time) > 0 then v - time else min
     end
 
     return min
@@ -112,7 +113,6 @@ end
 function task.loop()
     while true do
         task.step()
-
 
         task.__sleep(min(wait_poll) * 1000000)
         if task.CLOSE_WHEN_NO_JOBS and jobs_count <= 0 then

@@ -6,7 +6,8 @@
 #include <errno.h>
 
 int vlm___sleep(lua_State *L) {
-    usleep(luaL_checkinteger(L, 1));
+    int time = luaL_checkinteger(L, 1);
+    usleep((time < 1000000)?time:1000000);
 
     return 0;
 }
