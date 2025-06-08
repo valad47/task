@@ -13,6 +13,7 @@ local task = {}
     task.LOAD_SO = true
     task.SO_PREFIX = "vlm_"
     function task.__sleep() end
+    function task.__time() end
 
 local color = function (s, n)
         return "\27[38;5;".. n%256 .."m"..tostring(s).."\27[0m"
@@ -37,7 +38,6 @@ function task.step()
         end
     end
 
-
     for i, v in pairs(new_jobs) do
         table.insert(jobs, v[1])
         new_jobs[i] = nil
@@ -51,7 +51,7 @@ function task.step()
     end
 
     for i, v in pairs(wait_poll) do
-        if v <= os.time() then
+        if v <= task.__time() then
             debug(6, color("Resuming", 35), color(i, get_address(i)))
             wait_poll[i] = nil
             local pass, err = coroutine.resume(i)
@@ -76,7 +76,7 @@ function task.spawn(f, ...)
 end
 
 function task.wait(time)
-    local current = os.time()
+    local current = task.__time()
     local thread, main = coroutine.running()
 
     if main then
@@ -96,31 +96,36 @@ function task.wait(time)
     debug(5, color("Waiting ", 31), color(thread, get_address(thread)))
 
     coroutine.yield()
-    return (os.time() - current)
+    return (task.__time() - current)
 end
 
 local function min(t: {})
-    local min = 1;
+    local min = 0;
     for i, v in t do
-       local time = os.time()
+       local time = task.__time()
        min = if (v - time) < min  and (v - time) > 0 then v - time else min
     end
 
     return min
 end
 
+function task.__closest_time()
+    return min(wait_poll)
+end
 
 function task.loop()
     while true do
         task.step()
 
-        task.__sleep(min(wait_poll) * 1000000)
+        task.__sleep(task.__closest_time())
         if task.CLOSE_WHEN_NO_JOBS and jobs_count <= 0 then
 		    if task.DEBUG then print(`\27[{task.ESCAPE_ROW};0H`) end
             return
         end
     end
 end
+
+function task.truethread() end
 
 function task.setdebug()
 	print(`\27[2J`)
