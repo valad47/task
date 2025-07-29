@@ -15,9 +15,7 @@ local task = {}
     function task.__sleep() end
     function task.__time() end
 
-local color = function (s, n)
-        return "\27[38;5;".. n%256 .."m"..tostring(s).."\27[0m"
-end
+local color = require_shared("color")
 
 local function debug(pos, ...)
     if not task.DEBUG then return end

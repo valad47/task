@@ -6,5 +6,8 @@ return {
 	},
     c_files = {
         "src/sleep.c"
+    },
+    dependency = {
+        "color"
     }
 }
