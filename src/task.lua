@@ -3,6 +3,7 @@ local jobs = {}
 local new_jobs = {}
 local jobs_count = 0
 local total_jobs = 0
+local steps = 0
 
 local task = {}
     task.DEBUG = false
@@ -28,7 +29,7 @@ local function get_address(t)
 end
 
 function task.step()
-    for i, v in pairs(jobs) do
+    for i, v in jobs do
         if coroutine.status(v) == "dead" then
             debug(3, "Deleting ", color(v, get_address(v)))
             jobs[i] = nil
@@ -36,7 +37,7 @@ function task.step()
         end
     end
 
-    for i, v in pairs(new_jobs) do
+    for i, v in new_jobs do
         table.insert(jobs, v[1])
         new_jobs[i] = nil
         debug(4, color("Starting", 76), color(v[1], get_address(v[1])))
@@ -48,17 +49,20 @@ function task.step()
         end
     end
 
-    for i, v in pairs(wait_poll) do
-        if v <= task.__time() then
+    local time = task.__time()
+    for i, v in wait_poll do
+        if v <= time then
             debug(6, color("Resuming", 35), color(i, get_address(i)))
             wait_poll[i] = nil
             local pass, err = coroutine.resume(i)
             if not pass then
                 print(color("[ ERROR ]", 52), color(i, get_address(i)), err)
             end
+            time = task.__time()
         end
     end
-
+    steps += 1
+    debug(1, `Steps: {steps}\tJobs: {jobs_count}\tTotal jobs: {total_jobs}`)
     return true
 end
 
@@ -81,15 +85,7 @@ function task.wait(time)
         error("[ERROR] You cannot use \"wait\" function outside of task.spawn() thread.", 2)
     end
 
-    local function stupid_lua_is_not_like_luau()
-        if time then
-            return time + current
-        else
-            return current
-        end
-    end
-
-    wait_poll[thread] = stupid_lua_is_not_like_luau()
+    wait_poll[thread] = if time then time+current else current
 
     debug(5, color("Waiting ", 31), color(thread, get_address(thread)))
 
@@ -98,9 +94,9 @@ function task.wait(time)
 end
 
 local function min(t: {})
-    local min = 0;
+    local min = 5;
+    local time = task.__time()
     for i, v in t do
-       local time = task.__time()
        min = if (v - time) < min  and (v - time) > 0 then v - time else min
     end
 
