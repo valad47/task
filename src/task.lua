@@ -1,9 +1,13 @@
 local wait_poll = {}
 local jobs = {}
 local new_jobs = {}
+local defer_list = {}
+local delay_args = {}
 local jobs_count = 0
 local total_jobs = 0
 local steps = 0
+
+local pprint = require_shared("pprint")
 
 local task = {}
     task.DEBUG = false
@@ -30,16 +34,20 @@ end
 
 function task.step()
     for i, v in jobs do
-        if coroutine.status(v) == "dead" then
+       if coroutine.status(v) == "dead" then
+            if defer_list[v] then
+                table.insert(new_jobs, defer_list[v])
+                defer_list[v] = nil
+            end
             debug(3, "Deleting ", color(v, get_address(v)))
-            jobs[i] = nil
+            table.remove(jobs, i)
             jobs_count = jobs_count - 1
         end
     end
 
     for i, v in new_jobs do
         table.insert(jobs, v[1])
-        new_jobs[i] = nil
+        table.remove(new_jobs, i)
         debug(4, color("Starting", 76), color(v[1], get_address(v[1])))
         jobs_count = jobs_count + 1
         total_jobs = total_jobs + 1
@@ -54,7 +62,16 @@ function task.step()
         if v <= time then
             debug(6, color("Resuming", 35), color(i, get_address(i)))
             wait_poll[i] = nil
-            local pass, err = coroutine.resume(i)
+
+            local pass, err
+
+            if delay_args[i] then
+                pass, err = coroutine.resume(i, table.unpack(delay_args[i]))
+                delay_args[i] = nil
+            else
+                pass, err = coroutine.resume(i)
+            end
+
             if not pass then
                 print(color("[ ERROR ]", 52), color(i, get_address(i)), err)
             end
@@ -66,26 +83,60 @@ function task.step()
     return true
 end
 
-function task.spawn(f, ...)
-    if type(f) ~= "function" then
-        error(color("[ERROR]", 52).." task.spawn claims only function as argument", 2)
-    end
+local function toThread(functionOrThread)
+    return if type(functionOrThread) == "function" then coroutine.create(functionOrThread) else functionOrThread
+end
 
-    local thread = coroutine.create(f)
+function task.spawn(functionOrThread, ...)
+    local thread = toThread(functionOrThread)
+
     debug(2, color("Creating ", 50), color(thread, get_address(thread)))
 
     table.insert(new_jobs, {thread, ...})
+    return thread
 end
 
-function task.wait(time)
-    local current = task.__time()
-    local thread, main = coroutine.running()
+function task.cancel(thread)
+    coroutine.close(thread)
+end
 
-    if main then
+function task.delay(duration, functionOrThread, ...)
+    local current = task.__time()
+    local thread = toThread(functionOrThread)
+
+    table.insert(jobs, thread)
+
+    jobs_count = jobs_count + 1
+    total_jobs = total_jobs + 1
+
+    wait_poll[thread] = if duration then duration+current else current
+    delay_args[thread] = {...}
+
+    return thread
+end
+
+function task.defer(functionOrThread, ...)
+    local thread = coroutine.running()
+    local newThread = toThread(functionOrThread)
+
+    if not table.find(jobs, thread) then
+        error("[ERROR] You cannot use \"defer\" function outside of task.spawn() thread.", 2)
+    end
+
+    defer_list[thread] = {newThread, ...}
+
+    return newThread
+end
+
+function task.wait(duration)
+    local current = task.__time()
+    local thread = coroutine.running()
+
+    if not table.find(jobs, thread) then
         error("[ERROR] You cannot use \"wait\" function outside of task.spawn() thread.", 2)
     end
 
-    wait_poll[thread] = if time then time+current else current
+    wait_poll[thread] = if duration then duration+current else current
 
     debug(5, color("Waiting ", 31), color(thread, get_address(thread)))
 
@@ -93,27 +144,24 @@ function task.wait(time)
     return (task.__time() - current)
 end
 
-local function min(t: {})
-    local min = 5;
+function task.__closest_time()
+    local min = 0;
     local time = task.__time()
-    for i, v in t do
+    for i, v in wait_poll do
        min = if (v - time) < min  and (v - time) > 0 then v - time else min
     end
 
     return min
 end
 
-function task.__closest_time()
-    return min(wait_poll)
-end
-
 function task.loop()
     while true do
         task.step()
 
-        task.__sleep(task.__closest_time())
+        local closest_time = task.__closest_time()
+        if closest_time > 0 then task.__sleep(closest_time) end
         if task.CLOSE_WHEN_NO_JOBS and jobs_count <= 0 then
-		    if task.DEBUG then print(`\27[{task.ESCAPE_ROW};0H`) end
+            if task.DEBUG then print(`\27[{task.ESCAPE_ROW};0H`) end
             return
         end
     end
