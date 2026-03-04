@@ -128,6 +128,16 @@ function task.defer(functionOrThread, ...)
     return newThread
 end
 
+function task.try(numberOfTimes, delay, func, ...)
+    local ok, result
+    for i = 1, numberOfTimes do
+        ok, result = pcall(func, ...)
+        if ok then break end
+        task.wait(delay)
+    end
+    return ok, result
+end
+
 function task.wait(duration)
     local current = task.__time()
     local thread = coroutine.running()
@@ -145,6 +155,7 @@ function task.wait(duration)
 end
 
 function task.__closest_time()
+    if #new_jobs > 0 then return 0 end
     local min = 0;
     local time = task.__time()
     for i, v in wait_poll do
@@ -160,7 +171,7 @@ function task.loop()
 
         local closest_time = task.__closest_time()
         if closest_time > 0 then task.__sleep(closest_time) end
-        if task.CLOSE_WHEN_NO_JOBS and jobs_count <= 0 then
+        if task.CLOSE_WHEN_NO_JOBS and jobs_count <= 0 and #new_jobs == 0 then
             if task.DEBUG then print(`\27[{task.ESCAPE_ROW};0H`) end
             return
         end
